@@ -62,39 +62,42 @@ public class TodoTaskSimpleParser {
 		return tags != null && tags.length > 0;
 	}
 
-	private int lineNumber;
-	private int contentPos;
-	private int contentEnd;
+	private static class Context {
+		private int lineNumber;
+		private int contentPos;
+		private int contentEnd;
+	}
 
 	public void parse(ITaskReporter reporter, char[] content) {
 		parse(reporter, content, 0, content.length, 0);
 	}
 
-	protected void parse(ITaskReporter reporter, char[] content,
-			int startIndex, int endIndex, int startLineNumber) {
-		lineNumber = startLineNumber;
-		contentPos = startIndex;
-		contentEnd = endIndex;
-		while (contentPos < contentEnd) {
-			int begin = contentPos;
-			final int end = findEndOfLine(content);
+	protected void parse(ITaskReporter reporter, char[] content, int startIndex,
+			int endIndex, int startLineNumber) {
+		Context context = new Context();
+		context.lineNumber = startLineNumber;
+		context.contentPos = startIndex;
+		context.contentEnd = endIndex;
+		while (context.contentPos < context.contentEnd) {
+			int begin = context.contentPos;
+			final int end = findEndOfLine(content, context);
 			if (begin < end) {
 				begin = findCommentStart(content, begin, end);
 				if (begin > 0) {
 					begin = skipSpaces(content, begin, end);
 					if (begin + minTagLength <= end) {
-						processLine(reporter, content, begin, end);
+						processLine(reporter, content, begin, end, context);
 					}
 				}
 			}
-			++lineNumber;
+			++context.lineNumber;
 		}
 	}
 
 	/**
 	 * returns the next index after the comment of -1 if there is no comment in
 	 * this line
-	 * 
+	 *
 	 * @param content
 	 * @param begin
 	 * @param end
@@ -117,13 +120,14 @@ public class TodoTaskSimpleParser {
 	}
 
 	private void processLine(ITaskReporter reporter, char[] content, int begin,
-			final int end) {
+			final int end, Context context) {
 		for (int i = 0; i < tags.length; ++i) {
 			final char[] tag = tags[i];
 			if (begin + tag.length <= end
 					&& compareTag(content, begin, end, tag)) {
 				final String msg = new String(content, begin, end - begin);
-				reporter.reportTask(msg, lineNumber, priorities[i], begin, end);
+				reporter.reportTask(msg, context.lineNumber, priorities[i],
+						begin, end);
 				break;
 			}
 		}
@@ -154,24 +158,25 @@ public class TodoTaskSimpleParser {
 		return true;
 	}
 
-	private int findEndOfLine(char[] content) {
-		while (contentPos < contentEnd) {
-			if (content[contentPos] == '\r') {
-				final int endLine = contentPos;
-				++contentPos;
-				if (contentPos < contentEnd && content[contentPos] == '\n') {
-					++contentPos;
+	private int findEndOfLine(char[] content, Context context) {
+		while (context.contentPos < context.contentEnd) {
+			if (content[context.contentPos] == '\r') {
+				final int endLine = context.contentPos;
+				++context.contentPos;
+				if (context.contentPos < context.contentEnd
+						&& content[context.contentPos] == '\n') {
+					++context.contentPos;
 				}
 				return endLine;
-			} else if (content[contentPos] == '\n') {
-				final int endLine = contentPos;
-				++contentPos;
+			} else if (content[context.contentPos] == '\n') {
+				final int endLine = context.contentPos;
+				++context.contentPos;
 				return endLine;
 			} else {
-				++contentPos;
+				++context.contentPos;
 			}
 		}
-		return contentPos;
+		return context.contentPos;
 	}
 
 }
